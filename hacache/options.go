@@ -23,7 +23,7 @@ type Options struct {
 	// 缓存使用的 storage
 	Storage Storage
 
-	// 生成缓存 key 的函数
+	// 生成缓存 key 的函数，函数参数必须与 Fn 一致
 	GenKeyFn interface{}
 
 	// 被缓存的原函数
