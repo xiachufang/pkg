@@ -8,7 +8,7 @@ Common Go utilities used by Xiachufang Engineering Team.
 ## Packages
 
 
-#### [limiter](https://github.com/xiachufang/pkg/tree/master/limiter)
+### [`limiter`](https://github.com/xiachufang/pkg/tree/master/limiter)
 
 Concurrency limiter.
 
@@ -35,7 +35,7 @@ func main() {
 ```
 
 
-#### [logger](https://github.com/xiachufang/pkg/tree/master/logger)
+### [`logger`](https://github.com/xiachufang/pkg/tree/master/logger)
 
 Syslog helper.
 
@@ -57,7 +57,7 @@ func main() {
 }
 ```
 
-#### [hacache](https://github.com/xiachufang/pkg/tree/master/hacache)
+### [`hacache`](https://github.com/xiachufang/pkg/tree/master/hacache)
 
 Cache component.
 
