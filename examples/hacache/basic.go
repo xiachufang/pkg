@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/go-redis/redis/v8"
+	"github.com/smira/go-statsd"
 	"github.com/xiachufang/pkg/hacache"
 	"github.com/xiachufang/pkg/hacache/storage"
 )
@@ -24,6 +25,10 @@ func main() {
 	redisClient := redis.NewClient(&redis.Options{
 		Addr: "localhost:6379",
 	})
+	statsdClient := statsd.NewClient("localhost:8125")
+
+	// 初始化监控上报连接
+	hacache.CurrentStats.Setup(statsdClient)
 
 	cache, err := hacache.New(&hacache.Options{
 		FnRunLimit:              10,               // LongTimeTask 同一时刻最多允许 10 个并发穿透到被缓存的原函数
