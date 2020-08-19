@@ -9,6 +9,7 @@ import (
 	"github.com/vmihailenco/msgpack/v5"
 	"github.com/xiachufang/pkg/hacache/storage"
 	"github.com/xiachufang/pkg/limiter"
+	"go.uber.org/zap"
 )
 
 // SkipCache 当缓存 key 为 SkipCache 值时，跳过缓存
@@ -36,6 +37,7 @@ type HaCache struct {
 	fnRunLimiter *limiter.Limiter
 	opt          *Options
 	events       chan Event
+	logger       *zap.Logger
 }
 
 // CachedValue 缓存值类型
@@ -61,6 +63,7 @@ func New(opt *Options) (*HaCache, error) {
 		fnRunLimiter: limiter.New(opt.FnRunLimit),
 		opt:          opt,
 		events:       make(chan Event, opt.EventBufferSize),
+		logger:       opt.Logger,
 	}
 	go hc.worker()
 	return hc, nil
@@ -71,6 +74,7 @@ func (hc *HaCache) worker() {
 	defer func() {
 		if v := recover(); v != nil {
 			CurrentStats.Incr(MWorkerPanic, 1)
+			hc.logger.Error(fmt.Sprintf("hacache worker paniced: %v", v))
 			hc.worker()
 		}
 	}()

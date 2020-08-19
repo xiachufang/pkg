@@ -2,6 +2,8 @@ package hacache
 
 import (
 	"time"
+
+	"go.uber.org/zap"
 )
 
 // Options ha-cache options struct
@@ -34,6 +36,9 @@ type Options struct {
 
 	// message encoder
 	Encoder Encoder
+
+	// logger
+	Logger *zap.Logger
 }
 
 // Storage storage is interface of cache
@@ -66,5 +71,13 @@ func (opt *Options) Init() {
 
 	if opt.Encoder == nil {
 		opt.Encoder = &HaEncoder{}
+	}
+
+	if opt.Logger == nil {
+		if l, err := zap.NewProduction(); err == nil {
+			opt.Logger = l
+		} else {
+			opt.Logger = zap.NewNop()
+		}
 	}
 }
