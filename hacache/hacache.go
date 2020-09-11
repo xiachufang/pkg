@@ -212,6 +212,7 @@ func (hc *HaCache) Do(args ...interface{}) (interface{}, error) {
 		CurrentStats.Incr(MMiss, 1)
 	}
 
+	// 缓存 miss，执行原函数
 	if err != nil {
 		res, err := hc.FnRun(false, args...)
 		if err != nil {
@@ -238,17 +239,17 @@ func (hc *HaCache) Do(args ...interface{}) (interface{}, error) {
 	if now > (expireAt + int64(hc.opt.MaxAcceptableExpiration.Seconds())) {
 		CurrentStats.Incr(MMissInvalid, 1)
 		res, err := hc.FnRun(false, args...)
-		// 触发限流，强制返回过期数据，并且跳过缓存更新步骤
-		if err == ErrorFnRunLimited {
+		// 触发限流、或者原函数执行错误，强制返回过期数据，并且跳过缓存更新步骤
+		if err != nil {
+			CurrentStats.Incr(MInvalidReturned, 1)
 			return hc.opt.Encoder.Decode(value.Bytes)
 		}
 
-		if err == nil {
-			hc.Trigger(&EventCacheInvalid{
-				Data: copy(res),
-				Key:  cacheKey,
-			})
-		}
+		hc.Trigger(&EventCacheInvalid{
+			Data: copy(res),
+			Key:  cacheKey,
+		})
+
 		return res, err
 	}
 
