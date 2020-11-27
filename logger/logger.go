@@ -20,11 +20,6 @@ type Options struct {
 
 // New constructs a new Logger
 func New(options *Options) (*zap.Logger, error) {
-	tag := filepath.Clean(strings.ReplaceAll(strings.Trim(options.Tag, " /"), ".", "/"))
-	writer, err := syslog.New(syslog.LOG_LOCAL0|syslog.LOG_INFO, tag)
-	if err != nil {
-		return nil, err
-	}
 	encoder := zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig())
 
 	// 开启 Debug 时，只开启 stdout 日志输出
@@ -32,6 +27,11 @@ func New(options *Options) (*zap.Logger, error) {
 		return zap.New(zapcore.NewCore(encoder, os.Stdout, zap.DebugLevel)), nil
 	}
 
+	tag := filepath.Clean(strings.ReplaceAll(strings.Trim(options.Tag, " /"), ".", "/"))
+	writer, err := syslog.New(syslog.LOG_LOCAL0|syslog.LOG_INFO, tag)
+	if err != nil {
+		return nil, err
+	}
 	var cores []zapcore.Core
 	cores = append(cores, NewCore(zapcore.InfoLevel, encoder, writer))
 
