@@ -17,7 +17,7 @@ func GenerateCacheKey(name string, age int) string {
 }
 
 // LongTimeTask cached func.
-func LongTimeTask(name string, age int) (string, error) {
+func LongTimeTask(ctx context.Context, name string, age int) (string, error) {
 	time.Sleep(time.Second)
 	return fmt.Sprintf("%s is %d years old.\n", name, age), nil
 }

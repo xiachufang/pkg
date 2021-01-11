@@ -68,7 +68,7 @@ type Foo struct {
 }
 
 // nolint: unparam
-func fn2(bar string) (*Foo, error) {
+func fn2(ctx context.Context, bar string) (*Foo, error) {
 	return &Foo{Bar: bar}, nil
 }
 
@@ -108,7 +108,7 @@ func TestHaCache_Cache_basic(t *testing.T) {
 }
 
 func TestHaCache_SkipCache(t *testing.T) {
-	var rd = func() (int, error) { return rand.Int(), nil }
+	var rd = func(ctx context.Context) (int, error) { return rand.Int(), nil }
 	hc, err := New(&Options{
 		Storage:  &LocalStorage{Data: make(map[string]*Value)},
 		GenKeyFn: func(name string) string { return SkipCache },
@@ -149,7 +149,7 @@ type ExpValue struct {
 	Value    string
 }
 
-func fn3(name string) (*ExpValue, error) {
+func fn3(ctx context.Context, name string) (*ExpValue, error) {
 	return &ExpValue{
 		Value:    name,
 		CreateTS: time.Now().Unix(),
@@ -219,7 +219,7 @@ func TestHaCache_Cache_limit(t *testing.T) {
 	var maxRun int32 = 2
 	var current int32 = 0
 
-	var foo = func(a int) (*Fooo, error) {
+	var foo = func(ctx context.Context, a int) (*Fooo, error) {
 		n := atomic.AddInt32(&current, 1)
 		if n > maxRun {
 			t.Fatal("fn run limiter error, max: ", maxRun, ". now: ", n)
