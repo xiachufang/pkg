@@ -125,4 +125,4 @@ run:
 # golangci.com configuration
 # https://github.com/golangci/golangci/wiki/Configuration
 service:
-  golangci-lint-version: 1.28.1 # use the fixed version to not introduce new linters unexpectedly
+  golangci-lint-version: 1.35.2 # use the fixed version to not introduce new linters unexpectedly
