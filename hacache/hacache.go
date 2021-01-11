@@ -218,7 +218,7 @@ func (hc *HaCache) Do(ctx context.Context, args ...interface{}) (interface{}, er
 	}
 
 	// 跳过缓存，一些无效值不需要存到缓存里
-	skipCacheSet := ctx.Value(SkipCacheSet).(bool)
+	skipCacheSet, _ := ctx.Value(SkipCacheSet).(bool)
 
 	// 缓存 miss，执行原函数
 	if err != nil {
