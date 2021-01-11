@@ -1,6 +1,7 @@
 package hacache
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"strconv"
@@ -82,7 +83,7 @@ func TestHaCache_Cache_basic(t *testing.T) {
 	if err != nil {
 		t.Fatal("init ha-cache error")
 	}
-	res, err := hc.Do("jack")
+	res, err := hc.Do(context.Background(), "jack")
 	// 这里等待 50ms，让刷新缓存的 goroutine 跑起来
 	time.Sleep(50 * time.Millisecond)
 
@@ -95,7 +96,7 @@ func TestHaCache_Cache_basic(t *testing.T) {
 		t.Fatal("cached value error: ", *jack)
 	}
 
-	res2, err := hc.Do("jack")
+	res2, err := hc.Do(context.Background(), "jack")
 	jack2, ok := res2.(*Foo)
 	if !ok || err != nil {
 		t.Fatal("decode error: ", err, res)
@@ -119,12 +120,12 @@ func TestHaCache_SkipCache(t *testing.T) {
 		t.Fatal("init ha-cache error")
 	}
 
-	v1, err := hc.Do("skip")
+	v1, err := hc.Do(context.Background(), "skip")
 	if err != nil {
 		t.Fatal("cache run error: ", err)
 	}
 
-	v2, err := hc.Do("skip")
+	v2, err := hc.Do(context.Background(), "skip")
 	if err != nil {
 		t.Fatal("cache run error: ", err)
 	}
@@ -133,7 +134,7 @@ func TestHaCache_SkipCache(t *testing.T) {
 		t.Fatal("skip cache error: ", v1, v2)
 	}
 
-	v3, err := hc.Do("skip")
+	v3, err := hc.Do(context.Background(), "skip")
 	if err != nil {
 		t.Fatal("cache run error: ", err)
 	}
@@ -171,14 +172,14 @@ func TestHaCache_Cache_expiration(t *testing.T) {
 		t.Fatal("init hc error: ", err)
 	}
 
-	if _, e := hc.Do("aa"); e != nil {
+	if _, e := hc.Do(context.Background(), "aa"); e != nil {
 		t.Error(e)
 	}
 
 	time.Sleep(time.Second)
 
 	var v *ExpValue
-	if result, err := hc.Do("aa"); err == nil {
+	if result, err := hc.Do(context.Background(), "aa"); err == nil {
 		v = result.(*ExpValue)
 	}
 
@@ -193,7 +194,7 @@ func TestHaCache_Cache_expiration(t *testing.T) {
 
 	// 触发了缓存更新任务，这里拿到的会是最新的
 	time.Sleep(100 * time.Millisecond)
-	res, _ := hc.Do("aa")
+	res, _ := hc.Do(context.Background(), "aa")
 	if time.Now().Unix()-res.(*ExpValue).CreateTS > 1 {
 		t.Fatal("background worker error")
 	}
@@ -203,7 +204,7 @@ func TestHaCache_Cache_expiration(t *testing.T) {
 	// 这里缓存过期时间太长，缓存无效，触发同步更新
 	time.Sleep(2 * time.Second)
 
-	res, _ = hc.Do("aa")
+	res, _ = hc.Do(context.Background(), "aa")
 	if time.Now().Unix()-res.(*ExpValue).CreateTS > 1 {
 		t.Fatal("background worker error")
 	}
@@ -244,7 +245,7 @@ func TestHaCache_Cache_limit(t *testing.T) {
 	wg.Add(5)
 	for i := 0; i < 5; i++ {
 		go func(age int) {
-			_, err := hc.Do(age)
+			_, err := hc.Do(context.Background(), age)
 			if err == nil {
 				atomic.AddInt32(&successCnt, 1)
 			}

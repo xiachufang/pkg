@@ -1,6 +1,7 @@
 package hacache
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
@@ -12,8 +13,12 @@ import (
 	"go.uber.org/zap"
 )
 
-// SkipCache 当缓存 key 为 SkipCache 值时，跳过缓存
-const SkipCache = "__hacache_skip_cache__"
+const (
+	// SkipCache 当缓存 key 为 SkipCache 值时，跳过缓存
+	SkipCache = "__hacache_skip_cache__"
+	// SkipCacheSet 当值为 true 时，不缓存原函数的返回值
+	SkipCacheSet = "__hacache_skip_cache_set__"
+)
 
 // Event 拉取缓存时，触发的事件类型
 type Event interface{}
@@ -196,7 +201,7 @@ func (hc *HaCache) Trigger(event Event) {
 }
 
 // Do 取缓存结果，如果不存在，则更新缓存
-func (hc *HaCache) Do(args ...interface{}) (interface{}, error) {
+func (hc *HaCache) Do(ctx context.Context, args ...interface{}) (interface{}, error) {
 	cacheKey := hc.GenCacheKey(args...)
 	if cacheKey == "" {
 		return nil, ErrorInvalidCacheKey
@@ -212,6 +217,9 @@ func (hc *HaCache) Do(args ...interface{}) (interface{}, error) {
 		CurrentStats.Incr(MMiss, 1)
 	}
 
+	// 跳过缓存，一些无效值不需要存到缓存里
+	skipCacheSet := ctx.Value(SkipCacheSet).(bool)
+
 	// 缓存 miss，执行原函数
 	if err != nil {
 		res, err := hc.FnRun(false, args...)
@@ -219,10 +227,12 @@ func (hc *HaCache) Do(args ...interface{}) (interface{}, error) {
 			CurrentStats.Incr(MFnRunErr, 1)
 			return nil, err
 		}
-		hc.Trigger(&EventCacheInvalid{
-			Data: res,
-			Key:  cacheKey,
-		})
+		if !skipCacheSet {
+			hc.Trigger(&EventCacheInvalid{
+				Data: res,
+				Key:  cacheKey,
+			})
+		}
 		return res, nil
 	}
 
@@ -245,10 +255,12 @@ func (hc *HaCache) Do(args ...interface{}) (interface{}, error) {
 			return hc.opt.Encoder.Decode(value.Bytes)
 		}
 
-		hc.Trigger(&EventCacheInvalid{
-			Data: copy(res),
-			Key:  cacheKey,
-		})
+		if !skipCacheSet {
+			hc.Trigger(&EventCacheInvalid{
+				Data: copy(res),
+				Key:  cacheKey,
+			})
+		}
 
 		return res, err
 	}
