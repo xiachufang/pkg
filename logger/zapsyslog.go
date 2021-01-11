@@ -15,6 +15,7 @@ type Core struct {
 }
 
 // NewCore return a new syslog zap Core
+// nolint: gocritic
 func NewCore(level zapcore.LevelEnabler, encoder zapcore.Encoder, writer *syslog.Writer) *Core {
 	return &Core{
 		LevelEnabler: level,
@@ -33,6 +34,7 @@ func (core *Core) With(fields []zapcore.Field) zapcore.Core {
 }
 
 // Check determines whether the supplied Entry should be logged
+// nolint: gocritic
 func (core *Core) Check(entry zapcore.Entry, checked *zapcore.CheckedEntry) *zapcore.CheckedEntry {
 	if core.Enabled(entry.Level) {
 		return checked.AddCore(entry, core)
@@ -42,6 +44,7 @@ func (core *Core) Check(entry zapcore.Entry, checked *zapcore.CheckedEntry) *zap
 
 // Write serializes the Entry and any Fields supplied at the log site and
 // writes them to their destination.
+// nolint: gocritic
 func (core *Core) Write(entry zapcore.Entry, fields []zapcore.Field) error {
 	// Generate the message.
 	buffer, err := core.encoder.EncodeEntry(entry, fields)

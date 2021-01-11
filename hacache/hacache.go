@@ -54,6 +54,7 @@ type CachedValue struct {
 }
 
 // New return a new ha-cache instance
+// nolint: gomnd
 func New(opt *Options) (*HaCache, error) {
 	if opt.Storage == nil {
 		return nil, errors.New("no storage found")
@@ -106,6 +107,7 @@ func (hc *HaCache) worker() {
 // FnRun 执行原函数，原函数执行时，受并发限制，
 // 如果是缓存过期异步更新，触发限流直接跳过；
 // 如果是缓存失效同步更新，触发限流服务报错
+// nolint: gomnd
 func (hc *HaCache) FnRun(background bool, args ...interface{}) (interface{}, error) {
 	CurrentStats.Incr(MFnRun, 1)
 	_, ok := hc.fnRunLimiter.Incr(1)
@@ -257,7 +259,7 @@ func (hc *HaCache) Do(ctx context.Context, args ...interface{}) (interface{}, er
 
 		if !skipCacheSet {
 			hc.Trigger(&EventCacheInvalid{
-				Data: copy(res),
+				Data: copyVal(res),
 				Key:  cacheKey,
 			})
 		}
