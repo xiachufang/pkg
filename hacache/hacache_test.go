@@ -68,7 +68,7 @@ type Foo struct {
 }
 
 // nolint: unparam
-func fn2(ctx context.Context, bar string) (*Foo, error) {
+func fn2(bar string) (*Foo, error) {
 	return &Foo{Bar: bar}, nil
 }
 
@@ -83,7 +83,7 @@ func TestHaCache_Cache_basic(t *testing.T) {
 	if err != nil {
 		t.Fatal("init ha-cache error")
 	}
-	res, err := hc.Do(context.Background(), "jack")
+	res, err := hc.Do("jack")
 	// 这里等待 50ms，让刷新缓存的 goroutine 跑起来
 	time.Sleep(50 * time.Millisecond)
 
@@ -96,7 +96,7 @@ func TestHaCache_Cache_basic(t *testing.T) {
 		t.Fatal("cached value error: ", *jack)
 	}
 
-	res2, err := hc.Do(context.Background(), "jack")
+	res2, err := hc.Do("jack")
 	jack2, ok := res2.(*Foo)
 	if !ok || err != nil {
 		t.Fatal("decode error: ", err, res)
@@ -120,12 +120,12 @@ func TestHaCache_SkipCache(t *testing.T) {
 		t.Fatal("init ha-cache error")
 	}
 
-	v1, err := hc.Do(context.Background(), "skip")
+	v1, err := hc.Do("skip")
 	if err != nil {
 		t.Fatal("cache run error: ", err)
 	}
 
-	v2, err := hc.Do(context.Background(), "skip")
+	v2, err := hc.Do("skip")
 	if err != nil {
 		t.Fatal("cache run error: ", err)
 	}
@@ -134,7 +134,7 @@ func TestHaCache_SkipCache(t *testing.T) {
 		t.Fatal("skip cache error: ", v1, v2)
 	}
 
-	v3, err := hc.Do(context.Background(), "skip")
+	v3, err := hc.Do("skip")
 	if err != nil {
 		t.Fatal("cache run error: ", err)
 	}
@@ -172,14 +172,14 @@ func TestHaCache_Cache_expiration(t *testing.T) {
 		t.Fatal("init hc error: ", err)
 	}
 
-	if _, e := hc.Do(context.Background(), "aa"); e != nil {
+	if _, e := hc.Do("aa"); e != nil {
 		t.Error(e)
 	}
 
 	time.Sleep(time.Second)
 
 	var v *ExpValue
-	if result, err := hc.Do(context.Background(), "aa"); err == nil {
+	if result, err := hc.Do("aa"); err == nil {
 		v = result.(*ExpValue)
 	}
 
@@ -194,7 +194,7 @@ func TestHaCache_Cache_expiration(t *testing.T) {
 
 	// 触发了缓存更新任务，这里拿到的会是最新的
 	time.Sleep(100 * time.Millisecond)
-	res, _ := hc.Do(context.Background(), "aa")
+	res, _ := hc.Do("aa")
 	if time.Now().Unix()-res.(*ExpValue).CreateTS > 1 {
 		t.Fatal("background worker error")
 	}
@@ -204,7 +204,7 @@ func TestHaCache_Cache_expiration(t *testing.T) {
 	// 这里缓存过期时间太长，缓存无效，触发同步更新
 	time.Sleep(2 * time.Second)
 
-	res, _ = hc.Do(context.Background(), "aa")
+	res, _ = hc.Do("aa")
 	if time.Now().Unix()-res.(*ExpValue).CreateTS > 1 {
 		t.Fatal("background worker error")
 	}
@@ -234,6 +234,9 @@ func TestHaCache_Cache_limit(t *testing.T) {
 		GenKeyFn:   func(i int) string { return strconv.Itoa(i) + "fn2-limit" },
 		Fn:         foo,
 		FnRunLimit: 2,
+		Encoder: NewEncoder(func() interface{} {
+			return Fooo{}
+		}),
 	})
 	if err != nil {
 		t.Fatal("init ha-cache error: ", err)
@@ -245,7 +248,7 @@ func TestHaCache_Cache_limit(t *testing.T) {
 	wg.Add(5)
 	for i := 0; i < 5; i++ {
 		go func(age int) {
-			_, err := hc.Do(context.Background(), age)
+			_, err := hc.Do(age)
 			if err == nil {
 				atomic.AddInt32(&successCnt, 1)
 			}
@@ -256,5 +259,58 @@ func TestHaCache_Cache_limit(t *testing.T) {
 
 	if successCnt != maxRun {
 		t.Fatal("expect success: 2, got: ", successCnt)
+	}
+}
+
+// 测试 context，跳过缓存
+func TestHaCache_Context(t *testing.T) {
+	var fn = func(ctx context.Context) (int64, error) {
+		IgnoreFuncResult(ctx)
+		return time.Now().UnixNano(), nil
+	}
+
+	hc, err := New(&Options{
+		FnRunLimit: 10,
+		Storage:    &LocalStorage{Data: make(map[string]*Value)},
+		GenKeyFn:   func(ctx context.Context) string { return "TestHaCache_Context" },
+		Fn:         fn,
+		Expiration: time.Hour,
+		Encoder: NewEncoder(func() interface{} {
+			return int64(0)
+		}),
+	})
+	if err != nil {
+		t.Fatal("init hacache error: ", err)
+	}
+
+	v1, _ := hc.Do(context.Background())
+	v2, _ := hc.Do(context.Background())
+	if v1 == v2 {
+		t.Fatal("cache context test fail: ", v1, v2)
+	}
+
+	var fn2 = func() (int64, error) {
+		return time.Now().UnixNano(), nil
+	}
+
+	hc, err = New(&Options{
+		FnRunLimit: 10,
+		Storage:    &LocalStorage{Data: make(map[string]*Value)},
+		GenKeyFn:   func() string { return "TestHaCache_bbContext" },
+		Fn:         fn2,
+		Expiration: time.Hour,
+		Encoder: NewEncoder(func() interface{} {
+			return int64(0)
+		}),
+	})
+	if err != nil {
+		t.Fatal("init hacache error: ", err)
+	}
+
+	v1, _ = hc.Do()
+	time.Sleep(time.Second)
+	v2, _ = hc.Do()
+	if v1.(int64) != v2.(int64) {
+		t.Fatal("cache context test fail: ", v1, v2)
 	}
 }
