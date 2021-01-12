@@ -201,11 +201,11 @@ func (hc *HaCache) Do(args ...interface{}) (interface{}, error) {
 	ctx := context.Background()
 	if len(args) > 0 {
 		if c, ok := args[0].(context.Context); ok {
-			ctx = c
+			ctx = WrapCacheContext(c)
+			args[0] = ctx
 		}
 	}
 
-	ctx = WrapCacheContext(ctx)
 	cacheKey := hc.GenCacheKey(args...)
 	if cacheKey == "" {
 		return nil, ErrorInvalidCacheKey

@@ -108,7 +108,7 @@ func TestHaCache_Cache_basic(t *testing.T) {
 }
 
 func TestHaCache_SkipCache(t *testing.T) {
-	var rd = func() (int, error) { return rand.Int(), nil }
+	var rd = func(name string) (int, error) { return rand.Int(), nil }
 	hc, err := New(&Options{
 		Storage:  &LocalStorage{Data: make(map[string]*Value)},
 		GenKeyFn: func(name string) string { return SkipCache },
@@ -284,8 +284,9 @@ func TestHaCache_Context(t *testing.T) {
 	}
 
 	v1, _ := hc.Do(context.Background())
+	time.Sleep(time.Second)
 	v2, _ := hc.Do(context.Background())
-	if v1 == v2 {
+	if v1.(int64) == v2.(int64) {
 		t.Fatal("cache context test fail: ", v1, v2)
 	}
 
