@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -16,7 +17,7 @@ func GenerateCacheKey(name string, age int) string {
 }
 
 // LongTimeTask cached func.
-func LongTimeTask(name string, age int) (string, error) {
+func LongTimeTask(ctx context.Context, name string, age int) (string, error) {
 	time.Sleep(time.Second)
 	return fmt.Sprintf("%s is %d years old.\n", name, age), nil
 }
@@ -46,7 +47,7 @@ func main() {
 		panic(err)
 	}
 
-	tom, err := cache.Do("tom", 10)
+	tom, err := cache.Do(context.Background(), "tom", 10)
 	if err != nil {
 		panic(err)
 	}
@@ -54,7 +55,7 @@ func main() {
 	// tom == "tom is 10 years old"
 	fmt.Println(tom.(string))
 
-	tom2, err := cache.Do("tom", 20)
+	tom2, err := cache.Do(context.Background(), "tom", 20)
 	if err != nil {
 		panic(err)
 	}

@@ -1,6 +1,7 @@
 package hacache
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
@@ -83,7 +84,7 @@ func (hc *HaCache) worker() {
 		event := <-hc.events
 		switch e := event.(type) {
 		case *EventCacheExpired:
-			data, err := hc.FnRun(true, e.Args)
+			data, err := hc.FnRun(context.Background(), true, e.Args)
 			if err != nil {
 				continue
 			}
@@ -101,7 +102,7 @@ func (hc *HaCache) worker() {
 // FnRun 执行原函数，原函数执行时，受并发限制，
 // 如果是缓存过期异步更新，触发限流直接跳过；
 // 如果是缓存失效同步更新，触发限流服务报错
-func (hc *HaCache) FnRun(background bool, args ...interface{}) (interface{}, error) {
+func (hc *HaCache) FnRun(ctx context.Context, background bool, args ...interface{}) (interface{}, error) {
 	CurrentStats.Incr(MFnRun, 1)
 	_, ok := hc.fnRunLimiter.Incr(1)
 	defer hc.fnRunLimiter.Decr(1)
@@ -110,6 +111,7 @@ func (hc *HaCache) FnRun(background bool, args ...interface{}) (interface{}, err
 		CurrentStats.Incr(MFnRunLimited, 1)
 	}
 
+	args = append([]interface{}{ctx}, args...)
 	// 异步更新的直接跳过，需要同步更新的返回报错
 	if !ok && background {
 		return nil, nil
@@ -196,13 +198,14 @@ func (hc *HaCache) Trigger(event Event) {
 }
 
 // Do 取缓存结果，如果不存在，则更新缓存
-func (hc *HaCache) Do(args ...interface{}) (interface{}, error) {
+func (hc *HaCache) Do(ctx context.Context, args ...interface{}) (interface{}, error) {
+	ctx = WrapCacheContext(ctx)
 	cacheKey := hc.GenCacheKey(args...)
 	if cacheKey == "" {
 		return nil, ErrorInvalidCacheKey
 	} else if cacheKey == SkipCache {
 		CurrentStats.Incr(MSkip, 1)
-		return hc.FnRun(false, args...)
+		return hc.FnRun(ctx, false, args...)
 	}
 
 	value, err := hc.Get(cacheKey)
@@ -214,15 +217,18 @@ func (hc *HaCache) Do(args ...interface{}) (interface{}, error) {
 
 	// 缓存 miss，执行原函数
 	if err != nil {
-		res, err := hc.FnRun(false, args...)
+		res, err := hc.FnRun(ctx, false, args...)
 		if err != nil {
 			CurrentStats.Incr(MFnRunErr, 1)
 			return nil, err
 		}
-		hc.Trigger(&EventCacheInvalid{
-			Data: res,
-			Key:  cacheKey,
-		})
+
+		if CacheResult(ctx) {
+			hc.Trigger(&EventCacheInvalid{
+				Data: res,
+				Key:  cacheKey,
+			})
+		}
 		return res, nil
 	}
 
@@ -238,17 +244,19 @@ func (hc *HaCache) Do(args ...interface{}) (interface{}, error) {
 	// 缓存过期已经超过了最大可接受时间，需要同步更新缓存，并返回最新内容
 	if now > (expireAt + int64(hc.opt.MaxAcceptableExpiration.Seconds())) {
 		CurrentStats.Incr(MMissInvalid, 1)
-		res, err := hc.FnRun(false, args...)
+		res, err := hc.FnRun(ctx, false, args...)
 		// 触发限流、或者原函数执行错误，强制返回过期数据，并且跳过缓存更新步骤
 		if err != nil {
 			CurrentStats.Incr(MInvalidReturned, 1)
 			return hc.opt.Encoder.Decode(value.Bytes)
 		}
 
-		hc.Trigger(&EventCacheInvalid{
-			Data: copy(res),
-			Key:  cacheKey,
-		})
+		if CacheResult(ctx) {
+			hc.Trigger(&EventCacheInvalid{
+				Data: copy(res),
+				Key:  cacheKey,
+			})
+		}
 
 		return res, err
 	}
