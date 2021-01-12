@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/xiachufang/pkg/logger"
+	"github.com/xiachufang/pkg/v2/logger"
 )
 
 func main() {

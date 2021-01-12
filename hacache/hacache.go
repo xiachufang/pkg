@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/vmihailenco/msgpack/v5"
-	"github.com/xiachufang/pkg/hacache/storage"
-	"github.com/xiachufang/pkg/limiter"
+	"github.com/xiachufang/pkg/v2/hacache/storage"
+	"github.com/xiachufang/pkg/v2/limiter"
 	"go.uber.org/zap"
 )
 

@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/xiachufang/pkg/limiter"
+	"github.com/xiachufang/pkg/v2/limiter"
 )
 
 func main() {

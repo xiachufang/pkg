@@ -7,8 +7,8 @@ import (
 
 	"github.com/go-redis/redis/v8"
 	"github.com/smira/go-statsd"
-	"github.com/xiachufang/pkg/hacache"
-	"github.com/xiachufang/pkg/hacache/storage"
+	"github.com/xiachufang/pkg/v2/hacache"
+	"github.com/xiachufang/pkg/v2/hacache/storage"
 )
 
 // GenerateCacheKey generate cache key
