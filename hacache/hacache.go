@@ -85,11 +85,11 @@ func (hc *HaCache) worker() {
 		event := <-hc.events
 		switch e := event.(type) {
 		case *EventCacheExpired:
-			data, err := hc.FnRun(true, e.Args)
+			data, err := hc.FnRun(true, e.Args...)
 			if err != nil {
 				continue
 			}
-			if err := hc.Set(hc.GenCacheKey(e.Args), data); err != nil {
+			if err := hc.Set(hc.GenCacheKey(e.Args...), data); err != nil {
 				continue
 			}
 		case *EventCacheInvalid:

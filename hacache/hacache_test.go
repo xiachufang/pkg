@@ -175,7 +175,7 @@ func TestHaCache_Cache_expiration(t *testing.T) {
 		t.Error(e)
 	}
 
-	time.Sleep(time.Second)
+	time.Sleep(2 * time.Second)
 
 	var v *ExpValue
 	if result, err := hc.Do("aa"); err == nil {
@@ -192,16 +192,18 @@ func TestHaCache_Cache_expiration(t *testing.T) {
 	}
 
 	// 触发了缓存更新任务，这里拿到的会是最新的
-	time.Sleep(100 * time.Millisecond)
+	// 完全过期，强制更新
+	time.Sleep(5 * time.Second)
 	res, _ := hc.Do("aa")
-	if time.Now().Unix()-res.(*ExpValue).CreateTS > 1 {
-		t.Fatal("background worker error")
+	now := time.Now().Unix()
+	if now-res.(*ExpValue).CreateTS > 1 {
+		t.Fatal("background worker error: ", now, res.(*ExpValue).CreateTS)
 	}
 
 	hc.opt.MaxAcceptableExpiration = time.Second
 	hc.opt.Expiration = time.Second
 	// 这里缓存过期时间太长，缓存无效，触发同步更新
-	time.Sleep(2 * time.Second)
+	time.Sleep(3 * time.Second)
 
 	res, _ = hc.Do("aa")
 	if time.Now().Unix()-res.(*ExpValue).CreateTS > 1 {
