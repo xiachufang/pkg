@@ -26,7 +26,7 @@ func call(fn interface{}, args ...interface{}) ([]reflect.Value, error) {
 }
 
 // copy 拷贝值，返回拷贝后的指针
-func copy(v interface{}) interface{} {
+func copyVal(v interface{}) interface{} {
 	if reflect.TypeOf(v).Kind() != reflect.Ptr {
 		return nil
 	}

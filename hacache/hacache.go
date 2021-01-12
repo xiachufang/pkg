@@ -50,6 +50,7 @@ type CachedValue struct {
 }
 
 // New return a new ha-cache instance
+// nolint: gomnd
 func New(opt *Options) (*HaCache, error) {
 	if opt.Storage == nil {
 		return nil, errors.New("no storage found")
@@ -124,6 +125,7 @@ func (hc *HaCache) FnRun(background bool, args ...interface{}) (interface{}, err
 	}
 
 	// 被缓存的函数签名为: func(args ...interface{}) (interface{}, error)
+	// nolint: gomnd
 	if len(result) != 2 {
 		return nil, fmt.Errorf("invalid fn: %v", hc.opt.Fn)
 	}
@@ -259,7 +261,7 @@ func (hc *HaCache) Do(args ...interface{}) (interface{}, error) {
 
 		if CacheResult(ctx) {
 			hc.Trigger(&EventCacheInvalid{
-				Data: copy(res),
+				Data: copyVal(res),
 				Key:  cacheKey,
 			})
 		}

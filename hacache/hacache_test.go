@@ -50,9 +50,8 @@ func (enc *MyEncoder) Encode(v interface{}) ([]byte, error) {
 func (enc *MyEncoder) Decode(b []byte) (interface{}, error) {
 	v := enc.NewValue()
 	err := msgpack.Unmarshal(b, v)
-	switch data := v.(type) {
-	case *Foo:
-		data.Cached = true
+	if v, ok := v.(*Foo); ok {
+		v.Cached = true
 	}
 
 	return v, err
