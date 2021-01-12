@@ -12,7 +12,7 @@ import (
 )
 
 // GenerateCacheKey generate cache key
-func GenerateCacheKey(name string, age int) string {
+func GenerateCacheKey(ctx context.Context, name string, age int) string {
 	return name
 }
 
