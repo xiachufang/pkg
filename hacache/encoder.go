@@ -42,9 +42,14 @@ func (enc *HaEncoder) Decode(b []byte) (interface{}, error) {
 	v := enc.NewValue()
 	switch msg := v.(type) {
 	case proto.Message:
-		return msg, proto.Unmarshal(b, msg)
+		err := proto.Unmarshal(b, msg)
+		return msg, err
+	case int64:
+		err := msgpack.Unmarshal(b, &msg)
+		return msg, err
 	default:
-		return msg, msgpack.Unmarshal(b, msg)
+		err := msgpack.Unmarshal(b, &msg)
+		return msg, err
 	}
 }
 

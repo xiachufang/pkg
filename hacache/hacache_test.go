@@ -1,6 +1,7 @@
 package hacache
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"strconv"
@@ -49,9 +50,8 @@ func (enc *MyEncoder) Encode(v interface{}) ([]byte, error) {
 func (enc *MyEncoder) Decode(b []byte) (interface{}, error) {
 	v := enc.NewValue()
 	err := msgpack.Unmarshal(b, v)
-	switch data := v.(type) {
-	case *Foo:
-		data.Cached = true
+	if v, ok := v.(*Foo); ok {
+		v.Cached = true
 	}
 
 	return v, err
@@ -107,7 +107,7 @@ func TestHaCache_Cache_basic(t *testing.T) {
 }
 
 func TestHaCache_SkipCache(t *testing.T) {
-	var rd = func() (int, error) { return rand.Int(), nil }
+	var rd = func(name string) (int, error) { return rand.Int(), nil }
 	hc, err := New(&Options{
 		Storage:  &LocalStorage{Data: make(map[string]*Value)},
 		GenKeyFn: func(name string) string { return SkipCache },
@@ -233,6 +233,9 @@ func TestHaCache_Cache_limit(t *testing.T) {
 		GenKeyFn:   func(i int) string { return strconv.Itoa(i) + "fn2-limit" },
 		Fn:         foo,
 		FnRunLimit: 2,
+		Encoder: NewEncoder(func() interface{} {
+			return Fooo{}
+		}),
 	})
 	if err != nil {
 		t.Fatal("init ha-cache error: ", err)
@@ -255,5 +258,59 @@ func TestHaCache_Cache_limit(t *testing.T) {
 
 	if successCnt != maxRun {
 		t.Fatal("expect success: 2, got: ", successCnt)
+	}
+}
+
+// 测试 context，跳过缓存
+func TestHaCache_Context(t *testing.T) {
+	var fn = func(ctx context.Context) (int64, error) {
+		IgnoreFuncResult(ctx)
+		return time.Now().UnixNano(), nil
+	}
+
+	hc, err := New(&Options{
+		FnRunLimit: 10,
+		Storage:    &LocalStorage{Data: make(map[string]*Value)},
+		GenKeyFn:   func(ctx context.Context) string { return "TestHaCache_Context" },
+		Fn:         fn,
+		Expiration: time.Hour,
+		Encoder: NewEncoder(func() interface{} {
+			return int64(0)
+		}),
+	})
+	if err != nil {
+		t.Fatal("init hacache error: ", err)
+	}
+
+	v1, _ := hc.Do(context.Background())
+	time.Sleep(time.Second)
+	v2, _ := hc.Do(context.Background())
+	if v1.(int64) == v2.(int64) {
+		t.Fatal("cache context test fail: ", v1, v2)
+	}
+
+	var fn2 = func() (int64, error) {
+		return time.Now().UnixNano(), nil
+	}
+
+	hc, err = New(&Options{
+		FnRunLimit: 10,
+		Storage:    &LocalStorage{Data: make(map[string]*Value)},
+		GenKeyFn:   func() string { return "TestHaCache_bbContext" },
+		Fn:         fn2,
+		Expiration: time.Hour,
+		Encoder: NewEncoder(func() interface{} {
+			return int64(0)
+		}),
+	})
+	if err != nil {
+		t.Fatal("init hacache error: ", err)
+	}
+
+	v1, _ = hc.Do()
+	time.Sleep(time.Second)
+	v2, _ = hc.Do()
+	if v1.(int64) != v2.(int64) {
+		t.Fatal("cache context test fail: ", v1, v2)
 	}
 }

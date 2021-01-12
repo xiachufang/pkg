@@ -1,6 +1,7 @@
 package hacache
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
@@ -49,6 +50,7 @@ type CachedValue struct {
 }
 
 // New return a new ha-cache instance
+// nolint: gomnd
 func New(opt *Options) (*HaCache, error) {
 	if opt.Storage == nil {
 		return nil, errors.New("no storage found")
@@ -123,6 +125,7 @@ func (hc *HaCache) FnRun(background bool, args ...interface{}) (interface{}, err
 	}
 
 	// 被缓存的函数签名为: func(args ...interface{}) (interface{}, error)
+	// nolint: gomnd
 	if len(result) != 2 {
 		return nil, fmt.Errorf("invalid fn: %v", hc.opt.Fn)
 	}
@@ -197,6 +200,14 @@ func (hc *HaCache) Trigger(event Event) {
 
 // Do 取缓存结果，如果不存在，则更新缓存
 func (hc *HaCache) Do(args ...interface{}) (interface{}, error) {
+	ctx := context.Background()
+	if len(args) > 0 {
+		if c, ok := args[0].(context.Context); ok {
+			ctx = WrapCacheContext(c)
+			args[0] = ctx
+		}
+	}
+
 	cacheKey := hc.GenCacheKey(args...)
 	if cacheKey == "" {
 		return nil, ErrorInvalidCacheKey
@@ -219,10 +230,13 @@ func (hc *HaCache) Do(args ...interface{}) (interface{}, error) {
 			CurrentStats.Incr(MFnRunErr, 1)
 			return nil, err
 		}
-		hc.Trigger(&EventCacheInvalid{
-			Data: res,
-			Key:  cacheKey,
-		})
+
+		if CacheResult(ctx) {
+			hc.Trigger(&EventCacheInvalid{
+				Data: res,
+				Key:  cacheKey,
+			})
+		}
 		return res, nil
 	}
 
@@ -245,10 +259,12 @@ func (hc *HaCache) Do(args ...interface{}) (interface{}, error) {
 			return hc.opt.Encoder.Decode(value.Bytes)
 		}
 
-		hc.Trigger(&EventCacheInvalid{
-			Data: copy(res),
-			Key:  cacheKey,
-		})
+		if CacheResult(ctx) {
+			hc.Trigger(&EventCacheInvalid{
+				Data: copyVal(res),
+				Key:  cacheKey,
+			})
+		}
 
 		return res, err
 	}
