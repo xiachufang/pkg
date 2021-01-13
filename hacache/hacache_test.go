@@ -67,8 +67,12 @@ type Foo struct {
 }
 
 // nolint: unparam
-func fn2(bar string) (*Foo, error) {
-	return &Foo{Bar: bar}, nil
+func fn2(bar string) *FnResult {
+	return &FnResult{
+		Val:    &Foo{Bar: bar},
+		Err:    nil,
+		Ignore: false,
+	}
 }
 
 // nolint: errcheck
@@ -107,7 +111,11 @@ func TestHaCache_Cache_basic(t *testing.T) {
 }
 
 func TestHaCache_SkipCache(t *testing.T) {
-	var rd = func(name string) (int, error) { return rand.Int(), nil }
+	var rd = func(name string) *FnResult {
+		return &FnResult{
+			Val: rand.Int(),
+		}
+	}
 	hc, err := New(&Options{
 		Storage:  &LocalStorage{Data: make(map[string]*Value)},
 		GenKeyFn: func(name string) string { return SkipCache },
@@ -148,11 +156,13 @@ type ExpValue struct {
 	Value    string
 }
 
-func fn3(name string) (*ExpValue, error) {
-	return &ExpValue{
-		Value:    name,
-		CreateTS: time.Now().Unix(),
-	}, nil
+func fn3(name string) *FnResult {
+	return &FnResult{
+		Val: &ExpValue{
+			Value:    name,
+			CreateTS: time.Now().Unix(),
+		},
+	}
 }
 
 // nolint: errcheck,
@@ -220,14 +230,16 @@ func TestHaCache_Cache_limit(t *testing.T) {
 	var maxRun int32 = 2
 	var current int32 = 0
 
-	var foo = func(a int) (*Fooo, error) {
+	var foo = func(a int) *FnResult {
 		n := atomic.AddInt32(&current, 1)
 		if n > maxRun {
 			t.Fatal("fn run limiter error, max: ", maxRun, ". now: ", n)
 		}
 		defer atomic.AddInt32(&current, -1)
 		time.Sleep(time.Second)
-		return &Fooo{Value: a}, nil
+		return &FnResult{
+			Val: &Fooo{Value: a},
+		}
 	}
 
 	hc, err := New(&Options{
@@ -265,9 +277,12 @@ func TestHaCache_Cache_limit(t *testing.T) {
 
 // 测试 context，跳过缓存
 func TestHaCache_Context(t *testing.T) {
-	var fn = func(ctx context.Context) (int64, error) {
-		IgnoreFuncResult(ctx)
-		return time.Now().UnixNano(), nil
+	var fn = func(ctx context.Context) *FnResult {
+		return &FnResult{
+			Val:    time.Now().UnixNano(),
+			Err:    nil,
+			Ignore: true,
+		}
 	}
 
 	hc, err := New(&Options{
@@ -291,8 +306,10 @@ func TestHaCache_Context(t *testing.T) {
 		t.Fatal("cache context test fail: ", v1, v2)
 	}
 
-	var fn2 = func() (int64, error) {
-		return time.Now().UnixNano(), nil
+	var fn2 = func() *FnResult {
+		return &FnResult{
+			Val: time.Now().UnixNano(),
+		}
 	}
 
 	hc, err = New(&Options{
