@@ -1,7 +1,6 @@
 package hacache
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"reflect"
@@ -49,6 +48,16 @@ type CachedValue struct {
 	CreateTS int64
 }
 
+// FnResult 被缓存函数返回值的通用结构
+type FnResult struct {
+	// Val 原函数返回值
+	Val interface{}
+	// Err 原函数返回的 error
+	Err error
+	// Ignore 忽略返回值，不设置回缓存
+	Ignore bool
+}
+
 // New return a new ha-cache instance
 // nolint: gomnd
 func New(opt *Options) (*HaCache, error) {
@@ -57,8 +66,12 @@ func New(opt *Options) (*HaCache, error) {
 	}
 	opt.Init()
 
-	if reflect.ValueOf(opt.Fn).Type().NumOut() != 2 {
-		return nil, errors.New("fn return value must be `(interface{}, error)`")
+	if reflect.ValueOf(opt.Fn).Type().NumOut() != 1 {
+		return nil, errors.New("fn return value must be `*hacache.FnResult`")
+	}
+	returnType := reflect.TypeOf(opt.Fn).Out(0)
+	if returnType != reflect.TypeOf((*FnResult)(nil)) {
+		return nil, errors.New("fn return value must be `*hacache.FnResult`")
 	}
 
 	hc := &HaCache{
@@ -86,10 +99,10 @@ func (hc *HaCache) worker() {
 		switch e := event.(type) {
 		case *EventCacheExpired:
 			data, err := hc.FnRun(true, e.Args...)
-			if err != nil {
+			if err != nil || data.Err != nil {
 				continue
 			}
-			if err := hc.Set(hc.GenCacheKey(e.Args...), data); err != nil {
+			if err := hc.Set(hc.GenCacheKey(e.Args...), data.Val); err != nil {
 				continue
 			}
 		case *EventCacheInvalid:
@@ -103,7 +116,8 @@ func (hc *HaCache) worker() {
 // FnRun 执行原函数，原函数执行时，受并发限制，
 // 如果是缓存过期异步更新，触发限流直接跳过；
 // 如果是缓存失效同步更新，触发限流服务报错
-func (hc *HaCache) FnRun(background bool, args ...interface{}) (interface{}, error) {
+// 被缓存的函数签名为: func(args ...interface{}) (*FnResult)
+func (hc *HaCache) FnRun(background bool, args ...interface{}) (*FnResult, error) {
 	CurrentStats.Incr(MFnRun, 1)
 	_, ok := hc.fnRunLimiter.Incr(1)
 	defer hc.fnRunLimiter.Decr(1)
@@ -124,18 +138,12 @@ func (hc *HaCache) FnRun(background bool, args ...interface{}) (interface{}, err
 		return nil, err
 	}
 
-	// 被缓存的函数签名为: func(args ...interface{}) (interface{}, error)
-	// nolint: gomnd
-	if len(result) != 2 {
-		return nil, fmt.Errorf("invalid fn: %v", hc.opt.Fn)
+	v, ok := result[0].Interface().(*FnResult)
+	if ok {
+		return v, nil
 	}
 
-	var fnRunErr error
-	if e := result[1].Interface(); e != nil {
-		fnRunErr = e.(error)
-	}
-
-	return result[0].Interface(), fnRunErr
+	return nil, fmt.Errorf("fnResult type convert error")
 }
 
 // GenCacheKey 生成缓存 key
@@ -200,20 +208,16 @@ func (hc *HaCache) Trigger(event Event) {
 
 // Do 取缓存结果，如果不存在，则更新缓存
 func (hc *HaCache) Do(args ...interface{}) (interface{}, error) {
-	ctx := context.Background()
-	if len(args) > 0 {
-		if c, ok := args[0].(context.Context); ok {
-			ctx = WrapCacheContext(c)
-			args[0] = ctx
-		}
-	}
-
 	cacheKey := hc.GenCacheKey(args...)
 	if cacheKey == "" {
 		return nil, ErrorInvalidCacheKey
 	} else if cacheKey == SkipCache {
 		CurrentStats.Incr(MSkip, 1)
-		return hc.FnRun(false, args...)
+		res, err := hc.FnRun(false, args...)
+		if err != nil {
+			return nil, err
+		}
+		return res.Val, res.Err
 	}
 
 	value, err := hc.Get(cacheKey)
@@ -226,18 +230,18 @@ func (hc *HaCache) Do(args ...interface{}) (interface{}, error) {
 	// 缓存 miss，执行原函数
 	if err != nil {
 		res, err := hc.FnRun(false, args...)
-		if err != nil {
+		if err != nil || res.Err != nil {
 			CurrentStats.Incr(MFnRunErr, 1)
 			return nil, err
 		}
 
-		if CacheResult(ctx) {
+		if !res.Ignore {
 			hc.Trigger(&EventCacheInvalid{
-				Data: res,
+				Data: res.Val,
 				Key:  cacheKey,
 			})
 		}
-		return res, nil
+		return res.Val, nil
 	}
 
 	expireAt := value.CreateTS + int64(hc.opt.Expiration.Seconds())
@@ -254,19 +258,19 @@ func (hc *HaCache) Do(args ...interface{}) (interface{}, error) {
 		CurrentStats.Incr(MMissInvalid, 1)
 		res, err := hc.FnRun(false, args...)
 		// 触发限流、或者原函数执行错误，强制返回过期数据，并且跳过缓存更新步骤
-		if err != nil {
+		if err != nil || res.Err != nil {
 			CurrentStats.Incr(MInvalidReturned, 1)
 			return hc.opt.Encoder.Decode(value.Bytes)
 		}
 
-		if CacheResult(ctx) {
+		if !res.Ignore {
 			hc.Trigger(&EventCacheInvalid{
-				Data: copyVal(res),
+				Data: copyVal(res.Val),
 				Key:  cacheKey,
 			})
 		}
 
-		return res, err
+		return res.Val, nil
 	}
 
 	CurrentStats.Incr(MMissExpired, 1)
