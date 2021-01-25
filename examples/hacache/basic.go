@@ -12,12 +12,12 @@ import (
 )
 
 // GenerateCacheKey generate cache key
-func GenerateCacheKey(ctx context.Context, name string, age int) string {
+func GenerateCacheKey(name string, age int) string {
 	return name
 }
 
 // LongTimeTask cached func.
-func LongTimeTask(ctx context.Context, name string, age int) *hacache.FnResult {
+func LongTimeTask(name string, age int) *hacache.FnResult {
 	time.Sleep(time.Second)
 	return &hacache.FnResult{
 		Val: fmt.Sprintf("%s is %d years old.\n", name, age),
