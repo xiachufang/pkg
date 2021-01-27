@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"runtime/debug"
 	"time"
 
 	"github.com/vmihailenco/msgpack/v5"
@@ -89,7 +90,7 @@ func (hc *HaCache) worker() {
 	defer func() {
 		if v := recover(); v != nil {
 			CurrentStats.Incr(MWorkerPanic, 1)
-			hc.logger.Error(fmt.Sprintf("hacache worker paniced: %v", v))
+			hc.logger.Error(fmt.Sprintf("hacache worker paniced: %v, stack: %s", v, string(debug.Stack())))
 			hc.worker()
 		}
 	}()
