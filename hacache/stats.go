@@ -71,8 +71,7 @@ type Stats struct {
 
 // Gauge 设置某项指标 gauge 数据
 func (s *Stats) Gauge(m GaugeMetricType, i int32) {
-	switch m {
-	case GMFnRunConcurrency:
+	if m == GMFnRunConcurrency {
 		atomic.StoreInt32(&s.FnRunConcurrency, i)
 	}
 }
