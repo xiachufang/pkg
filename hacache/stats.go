@@ -11,6 +11,8 @@ const defaultExportInterval = 5 * time.Second
 
 // MetricType 指标类型
 type MetricType string
+
+// GaugeMetricType gauge 指标类型
 type GaugeMetricType string
 
 const (
@@ -67,6 +69,7 @@ type Stats struct {
 	Exporter *statsd.Client
 }
 
+// Gauge 设置某项指标 gauge 数据
 func (s *Stats) Gauge(m GaugeMetricType, i int32) {
 	switch m {
 	case GMFnRunConcurrency:
