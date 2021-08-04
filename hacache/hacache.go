@@ -123,6 +123,9 @@ func (hc *HaCache) FnRun(background bool, args ...interface{}) (*FnResult, error
 	_, ok := hc.fnRunLimiter.Incr(1)
 	defer hc.fnRunLimiter.Decr(1)
 
+	// 统计当前原函数执行的并发度
+	CurrentStats.Gauge(GMFnRunConcurrency, hc.fnRunLimiter.GetCurrent())
+
 	if !ok {
 		CurrentStats.Incr(MFnRunLimited, 1)
 	}

@@ -11,6 +11,7 @@ const defaultExportInterval = 5 * time.Second
 
 // MetricType 指标类型
 type MetricType string
+type GaugeMetricType string
 
 const (
 	// MHit 命中有效缓存
@@ -35,6 +36,8 @@ const (
 	MSkip MetricType = "skip"
 	// MWorkerPanic worker goroutine panic times
 	MWorkerPanic MetricType = "worker-panic"
+	// GMFnRunConcurrency 原函数执行并发度
+	GMFnRunConcurrency GaugeMetricType = "fn-run-concurrency"
 )
 
 // Stats 缓存统计数据
@@ -58,7 +61,17 @@ type Stats struct {
 	Skip             int32
 	WorkerPanic      int32
 
+	// FnRun 当前执行并发度
+	FnRunConcurrency int32
+
 	Exporter *statsd.Client
+}
+
+func (s *Stats) Gauge(m GaugeMetricType, i int32) {
+	switch m {
+	case GMFnRunConcurrency:
+		atomic.StoreInt32(&s.FnRunConcurrency, i)
+	}
 }
 
 // Incr 增加某项指标数据
@@ -106,6 +119,13 @@ func (s *Stats) Export() map[MetricType]int32 {
 	}
 }
 
+// ExportGauge 获取 Gauge 数据
+func (s *Stats) ExportGauge() map[GaugeMetricType]int32 {
+	return map[GaugeMetricType]int32{
+		GMFnRunConcurrency: atomic.LoadInt32(&s.FnRunConcurrency),
+	}
+}
+
 // Run 上报数据
 func (s *Stats) Run() {
 	defer func() {
@@ -128,6 +148,10 @@ func (s *Stats) Run() {
 				continue
 			}
 			s.Exporter.Incr("ha-cache", int64(value), statsd.StringTag("m", string(metric)))
+		}
+
+		for gaugeMetrics, value := range s.ExportGauge() {
+			s.Exporter.Gauge("ha-cache-gauge", int64(value), statsd.StringTag("m", string(gaugeMetrics)))
 		}
 	}
 }
