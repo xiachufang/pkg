@@ -37,3 +37,8 @@ func (limiter *Limiter) Decr(v int32) (int32, bool) {
 
 	return atomic.AddInt32(&limiter.Current, -v), true
 }
+
+// GetCurrent get current concurrency
+func (limiter *Limiter) GetCurrent() int32 {
+	return atomic.LoadInt32(&limiter.Current)
+}
