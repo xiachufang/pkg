@@ -100,7 +100,7 @@ func (hc *HaCache) worker() {
 		switch e := event.(type) {
 		case *EventCacheExpired:
 			data, err := hc.FnRun(true, e.Args...)
-			if err != nil || (data != nil && data.Err != nil) {
+			if err != nil || (data != nil && (data.Err != nil || data.Ignore)) {
 				continue
 			}
 			if err := hc.Set(hc.GenCacheKey(e.Args...), data.Val); err != nil {
