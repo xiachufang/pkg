@@ -197,7 +197,7 @@ func (hc *HaCache) Set(key string, data interface{}) error {
 	if err != nil {
 		return err
 	}
-	return hc.opt.Storage.Set(key, value, 0)
+	return hc.opt.Storage.Set(key, value, hc.opt.Expiration + hc.opt.MaxAcceptableExpiration)
 }
 
 // Trigger 触发某个 event (non-blocking)
