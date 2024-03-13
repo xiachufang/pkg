@@ -8,5 +8,6 @@ require (
 	github.com/smira/go-statsd v1.3.1
 	github.com/vmihailenco/msgpack/v5 v5.0.0-beta.1
 	go.uber.org/zap v1.15.0
-	google.golang.org/protobuf v1.25.0
+	google.golang.org/genproto v0.0.0-20200526211855-cb27e3aa2013 // indirect
+	google.golang.org/protobuf v1.33.0
 )
